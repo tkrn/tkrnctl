@@ -13,24 +13,22 @@ There are variables that need to be defined before using the script. BTRIX_USER 
 
 First copy the example for your modification:
 
-```bash
+```shell
 cp tkrnctl.env.example tkrnctl.env
 ```
 
 Then the following needs to be specified in tkrnctl.env:
 
-```bash
+```shell
 BTRIX_USER=""  
 BTRIX_PASS=""  
 BTRIX_ORG=""
 ```
 
 Lastly, specificy where you're warcs/wacz are located. The script will loop through the prefix of crawls to determine a list of crawled workflows/jobs.
-```
+```shell
 WARCS_PATH=/dpool/arc/pywb/webarchive/collections/stacks/archive/
 ```
 
 ### Notice
 This script was designed for internal use and use cases. It may not fit what you need to do but I'm always open to suggestions. This helps fill a gap in tool set for how I crawl for tkrn's archive. 
-## 
-* * *
