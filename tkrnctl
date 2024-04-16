@@ -1,0 +1,314 @@
+#!/bin/bash
+
+###############################################################################
+# STATIC VARIABLES                                                            #
+###############################################################################
+
+VERSION=0.1
+
+RED="\e[;91m"
+BLUE="\e[0;94m"
+GREEN="\e[0;92m"
+WHITE="\e[0;97m"
+BOLDPURPLE="\e[1;35m"
+RESET="\e[0m"
+REGEX_PATTERN="[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9](?:\.[a-zA-Z]{2,})+"
+
+###############################################################################
+# RUNTIME VARIABLES                                                           #
+###############################################################################
+
+ENVFILE=""
+PARAM=""
+MODE="" #list, create, bulkcreate, tmplupdate
+RUNDIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+VERBOSE=false
+CRAWLTMPL_FULLPATH=""
+JSON_CUSTOM=""
+
+###############################################################################
+# FUNCTIONS                                                                   #
+###############################################################################
+
+print_help () {  
+  printf "$GREEN%s$RESET\n" "Useage:"
+  printf "  -c <site>   - Create single Browsertrix Cloud workflow\n"
+  printf "  -b <file>   - Create bulk Browsertrix Cloud workflows from file\n"
+  printf "  -j <file>   - Browsertrix Cloud workflow JSON template to post via API\n"
+  printf "  -l          - Lists currently archived websites\n\n" 
+
+}
+
+print_header () {
+  printf "\n$BOLDPURPLE%s$RESET\n\n" "tkrn's archive control tool - $VERSION"
+}
+
+print_paths () {
+  printf "$GREEN%s$RESET\n" "Current Configured Paths:"
+  printf "  $WHITE%s$BLUE%s$RESET\n" "Environment Variable Path : " $ENVFILE
+  printf "  $WHITE%s$BLUE%s$RESET\n" "Template Seed JSON        : " $CRAWLTMPL_FULLPATH
+  printf "  $WHITE%s$BLUEv%s$RESET\n\n" "WARCs Path                : " $WARCS_PATH
+}
+
+print_tkrntmp () {
+  printf "$WHITE%s$WHITE%s$RESET\n\n" "Working tmp Path: " $TKRNTMP
+}
+
+check_required_binaries () {
+  JQ_PATH=$(which jq)
+  CURL_PATH=$(which curl)
+
+  if [ ! "$JQ_PATH" ]; then
+    printf "$RED%s$RESET\n\n" "Path to 'jq' not found! Please install! Exiting.."
+    exit 1
+  fi
+
+  if [ ! "$CURL_PATH" ]; then
+    printf "$RED%s$RESET\n\n" "Path to 'curl' not found! Please install! Exiting.."
+    exit 1
+  fi
+}
+
+eval_environment () {
+
+  if [ -f $RUNDIR/tkrnctl.env ]; then
+    ENVFILE="$RUNDIR/tkrnctl.env"
+  fi
+
+  if [ -f "~/.tkrnctl/tkrnctl.env" ]; then
+    ENVFILE="~/.tkrnctl/tkrnctl.env"
+  fi
+
+  if [ ! -f $ENVFILE ]; then
+    printf "$RED%s$RESET\n\n" "Cannot open a tkrnctl.env environment file. Exiting.."
+    exit 1
+  fi
+ 
+  source $ENVFILE
+}
+
+btrix_authenicate () {
+  LOGIN_RESPONSE=$(curl -sfX POST -F "username=$BTRIX_USER" -F "password=$BTRIX_PASS" $BTRIX_LOGIN_URL)
+
+  if [ $VERBOSE == true ]; then
+    printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][LOGIN_RESPONSE]: " $LOGIN_RESPONSE
+  fi
+
+  ACCESS_TOKEN=$(echo $LOGIN_RESPONSE | jq -r .access_token)
+
+  if [ $VERBOSE == true ]; then
+    printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][ACCESS_TOKEN]: " $ACCESS_TOKEN
+  fi
+
+  if [ -n "$ACCESS_TOKEN" ]; then
+    printf "$GREEN%s$WHITE%s$RESET\n\n" "Successful login! " "$(date)"
+  else
+    printf "$RED%s$WHITE%s$RESET\n\n" "Failed login! Cannot proceed to do any work.. " "$(date)"
+  fi
+}
+
+create_tmp_dir () {
+  TKRNTMP=$(mktemp -d -t tkrnctl_XXXXXXXXXX)
+}
+
+create_workflow_post_data () {
+  RND=$(date +%s%N | sha256sum | head -c 10)
+  cp $CRAWLTMPL_FULLPATH $TKRNTMP/$RND.json
+  sed -i "s/$SEEDURL_REPLACE/$1/g" $TKRNTMP/$RND.json
+  echo $TKRNTMP/$RND.json
+}
+
+validate_template () {
+
+  if [ -n "$JSON_CUSTOM" ]; then
+    
+    if [ ! -f "$JSON_CUSTOM" ]; then
+      CRAWLTMPL_FULLPATH=$RUNDIR/$SEEDCRAWL_TMPL
+    else
+      CRAWLTMPL_FULLPATH=$RUNDIR/$JSON_CUSTOM
+    fi
+  else
+    CRAWLTMPL_FULLPATH=$RUNDIR/$SEEDCRAWL_TMPL
+  fi
+ 
+  if [ ! -f $CRAWLTMPL_FULLPATH ]; then
+    printf "$RED%s$RESET\n\n" "Could find/not access template file.."
+    exit 1
+  fi
+}
+
+validate_url () {
+  if [[ "$1" =~ ^[0-9]{8}$ ]]; then
+      echo "Valid date"
+  else
+      echo "Invalid date"
+  fi
+}
+
+###############################################################################
+# ENTRY POINT                                                                 #
+###############################################################################
+print_header
+check_required_binaries
+eval_environment
+
+###############################################################################
+# PROCESS PARAMETERS                                                          #
+###############################################################################
+
+while getopts ":lvb:c:j:" FLAG
+do
+  case "${FLAG}" in   
+    l)
+      MODE="list"
+      ;;
+    v)
+      VERBOSE=true
+      ;;
+    b)
+      MODE="bulkcreate"
+      PARAM=$OPTARG
+      ;;
+    j)
+      JSON_CUSTOM=$OPTARG
+    ;;
+    c)
+      MODE="create"
+      PARAM=$OPTARG
+      ;;
+    *)
+      print_help
+      printf "$RED%s$RESET\n\n" "Unknown or incorrect usage.."
+      ;;
+  esac
+done
+
+if [[ "$MODE" == "" ]]; then
+  print_help
+fi
+
+validate_template
+print_paths
+
+###############################################################################
+# DO THE WORK                                                                 #
+###############################################################################
+
+case "$MODE"
+in
+  create)
+    btrix_authenicate
+    if [ -n "$ACCESS_TOKEN" ]; then
+      if [ -n "$PARAM" ]; then
+        create_tmp_dir
+        print_tkrntmp      
+        if [ -n "$ACCESS_TOKEN" ]; then
+          POSTFILE=$(create_workflow_post_data $PARAM)
+
+          if [ $VERBOSE == true ]; then
+            printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][POSTFILE]: " $POSTFILE
+          fi
+          
+          POST_RESPONSE=$(curl -sX POST -H "Content-Type: application/json" -H "Authorization: Bearer $ACCESS_TOKEN" -d @"$POSTFILE" $BTRIX_WORKFLOW_URL)
+          
+          if [ $VERBOSE == true ]; then
+            printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][POST_RESPONSE]: " $POST_RESPONSE
+          fi
+
+          CLEANED_RESPONSE=$(echo $POST_RESPONSE | jq -r .added)
+          if [ $CLEANED_RESPONSE == "true" ]; then
+            printf " $GREEN%s$RESET $PARAM\n" "Workflow created:"
+          else
+            printf " $RED%s$RESET $PARAM\n" "Workflow failed to create:" 
+          fi	      
+        fi
+      else
+        printf "$RED%s$RESET\n" "No site defined! "
+      fi
+      printf "\n" 
+    fi
+  ;;
+  
+  bulkcreate)
+    if [ ! -f $PARAM ]; then
+      printf "$RED%s$RESET\n\n" "Could find/not access the bulk import file.."
+      exit 1
+    fi
+
+    RNDLINES=$(shuf -n 15 $PARAM)
+
+    printf "$RED%s$RESET:\n" "Sites (random 15)"
+    while LINE= read -r line ;do
+      printf '  %s\n' $line
+    done <<< "$RNDLINES"
+  
+    printf "\n$WHITE%s$RESET [$GREEN%s$RESET/$RED%s$RESET] " "Does this look correct" "Y" "n"
+    read -r input
+    printf "\n"    
+    case $input in
+    [yY][eE][sS]|[yY])
+
+      
+      btrix_authenicate
+      if [ -n "$ACCESS_TOKEN" ]; then
+        create_tmp_dir
+        print_tkrntmp      
+
+        while read LINE; do
+          POSTFILE=$(create_workflow_post_data $LINE)
+
+          if [ $VERBOSE == true ]; then
+            printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][POSTFILE]: " $POSTFILE
+          fi
+          
+          POST_RESPONSE=$(curl -sX POST -H "Content-Type: application/json" -H "Authorization: Bearer $ACCESS_TOKEN" -d @"$POSTFILE" $BTRIX_WORKFLOW_URL)
+          
+          if [ $VERBOSE == true ]; then
+            printf "$RED%s$WHITE%s$RESET\n" "[VERBOSE][POST_RESPONSE]: " $POST_RESPONSE
+          fi
+
+          CLEANED_RESPONSE=$(echo $POST_RESPONSE | jq -r .added)
+          if [ $CLEANED_RESPONSE == "true" ]; then
+            if [ $VERBOSE == true ]; then
+              printf "$GREEN%s$WHITE%s%s$RESET\n" "[VERBOSE][WORKFLOW]:" " Created - " $LINE
+            else
+              printf " $GREEN%s$RESET $LINE\n" "Workflow created:"
+            fi        
+          else
+            if [ $VERBOSE == true ]; then
+              printf "$RED%s$WHITE%s%s$RESET\n" "[VERBOSE][WORKFLOW]:" " Failed - " $LINE
+            else
+              printf " $RED%s$RESET $LINE\n" "Workflow failed to create:" 
+            fi  
+          fi	      
+        done < $PARAM
+      else
+        printf "$RED%s$RESET\n" "Failed login."
+      fi
+      printf "\n"
+    ;;
+    [nN][oO]|[nN])
+      exit 1
+      ;;
+    *)
+      printf "$RED%s$RESET\n" "Invalid input.."
+      exit 1
+    ;;
+    esac
+  ;;
+
+  list)
+    printf "\n$GREEN%s$WHITE$FILE$RESET\n\n" "Depending on size this may take some time to crunch.. "
+    declare -a SITES 
+    for WARC in `find $WARCS_PATH -type f \( -iname \*.warc.gz -o -iname \*.wacz \)`
+    do
+      CURSITE=$(basename $WARC| awk '{split($0,a,"_"); print a[1]}')
+      SITES+=("$CURSITE")	
+    done
+
+    FILE=tkrnctl-indexed-$(date -I).txt
+    echo ${SITES[@]} | awk 'BEGIN{RS=" ";} {print $1}' | sort | uniq > $FILE 
+    echo "$(<$FILE)"
+    printf "$GREEN%s$WHITE$FILE$RESET\n\n" "Outputted to: "
+  ;;
+esac
