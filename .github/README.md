@@ -1,7 +1,7 @@
 
 # tkrn's archive control tool
 
-In summary this is a bash command line tool to help assist posting workflows to Browstertrix Cloud instances through their API. This tool allows you to have multiple json files that you based off the site you're looking to crawl giving you a 'template' of exclusions, tags and other parameters for your crawling needs. Additionally, you can bulk add sites by specifying a text file which is line delimited. 
+In summary this is a bash command line tool to help assist posting workflows to [Browstertrix Cloud](https://github.com/webrecorder/browsertrix-cloud/) instances through their API. This tool allows you to have multiple json files that you based off the site you're looking to crawl giving you a 'template' of exclusions, tags and other parameters for your crawling needs. Additionally, you can bulk add sites by specifying a text file which is line delimited. 
 
 ![tkrnctl animation](https://github.com/tkrn/tkrnctl/blob/main/.github/tkrnctl-animation.gif?raw=true)
 
@@ -31,4 +31,4 @@ WARCS_PATH=/dpool/arc/pywb/webarchive/collections/stacks/archive/
 ```
 
 ### Notice
-This script was designed for internal use and use cases. It may not fit what you need to do but I'm always open to suggestions. This helps fill a gap in tool set for how I crawl for tkrn's archive. 
+This script was designed for internal use and use cases. It may not fit what you need to do but I'm always open to suggestions. This helps fill a gap in tool set for how I crawl for tkrn's archive. Lastly, this was developed against self-hosted solution and not Browsertrix Hosted although it should work in theory it hasn't been tested.
