@@ -1,0 +1,52 @@
+{
+  "jobType": "seed-crawl",
+  "name": "###SEEDURL###",
+  "description": null,
+  "scale": 1,
+  "profileid": "",
+  "runNow": false,
+  "schedule": "",
+  "crawlTimeout": 0,
+  "maxCrawlSize": 0,
+  "tags": [
+    "batch 3",
+    "wiki",
+    "manual"
+  ],
+  "autoAddCollections": [],
+  "config": {
+    "seeds": [
+      {
+        "url": "http://###SEEDURL###",
+        "scopeType": "domain",
+        "include": [],
+        "extraHops": 1,
+        "depth": 35
+      }
+    ],
+    "scopeType": "domain",
+    "useSitemap": true,
+    "failOnFailedSeed": false,
+    "behaviorTimeout": 300,
+    "pageLoadTimeout": 900,
+    "pageExtraDelay": 5,
+    "limit": null,
+    "lang": "en",
+    "exclude": [
+      "action=edit",
+      "Talk:",
+      "Special:",
+      "diff=",
+      "oldid=",
+      "action=history",
+      "action=info",
+      "User_talk:",
+      "undo=",
+      "mobileaction=",
+      "stableid=",
+      "redirect=no"
+    ],
+    "behaviors": "autoscroll,autoplay,autofetch,siteSpecific"
+  },
+  "crawlFilenameTemplate": "###SEEDURL###_@ts.wacz"
+}

@@ -1,0 +1,58 @@
+{
+  "jobType": "seed-crawl",
+  "name": "###SEEDURL###",
+  "description": null,
+  "scale": 1,
+  "profileid": "",
+  "runNow": false,
+  "schedule": "",
+  "crawlTimeout": 0,
+  "maxCrawlSize": 0,
+  "tags": [
+    "manual",
+    "forum",
+    "batch 3"
+  ],
+  "autoAddCollections": [],
+  "config": {
+    "seeds": [
+      {
+        "url": "http://###SEEDURL###",
+        "scopeType": "domain",
+        "include": [],
+        "extraHops": 1,
+        "depth": 35
+      }
+    ],
+    "scopeType": "domain",
+    "useSitemap": true,
+    "failOnFailedSeed": false,
+    "behaviorTimeout": 300,
+    "pageLoadTimeout": 900,
+    "pageExtraDelay": 5,
+    "limit": null,
+    "lang": "en",
+    "exclude": [
+      "action=addevent",
+      "action=dayview",
+      "action=weekview",
+      "action=register",
+      "perpage=",
+      "action=addsubscription",
+      "action=newpost",
+      "my_post_key=",
+      "action=lastpost",
+      "action=referral",
+      "sortby=",
+      "action=nextnewest",
+      "action=nextoldest",
+      "search.php",
+      "newreply.php",
+      "sendthread.php",
+      "polls.php",
+      "action=whoposted"
+    ],
+    "behaviors": "autoscroll,autoplay,autofetch,siteSpecific"
+  },
+  "crawlFilenameTemplate": "###SEEDURL###_@ts.wacz"
+}
