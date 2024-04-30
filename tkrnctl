@@ -1,11 +1,24 @@
 #!/usr/bin/env python3
 
 # standard stuff
-import argparse, requests, sys, json, termcolor
-
+import argparse, requests, sys, json, termcolor, os
+from dotenv import load_dotenv
 version = "1.0.0"
-default_template = "seed-crawl.tmpl"
-template_replace_txt = "###SEEDURL###"
+
+# defaults
+json_header =  {"Content-Type":"application/json"}
+login_header = {"Content-Type":"application/x-www-form-urlencoded"}
+btrix_default_protocol = "http"
+btrix_default_hostname = "localhost"
+btrix_default_port = "30870"
+
+# runtime variables
+access_token = None
+btrix_protocol = None
+btrix_hostname = None
+btrix_port = None
+btrix_username = None
+btrix_password = None
 
 # dealing with the input/output of the program
 parser = argparse.ArgumentParser(prog="tkrnctl", add_help=False,
@@ -37,15 +50,58 @@ elif args.bulkfilename:
         mode = "bulkcreate"
 
 # lets define those functions
-def evaluate_env():
-    print("evaluate_env")
+def evaluate_environment():
+    print("evaluate_environment")
+    env = "./.env"
+    if os.path.isfile(env) and os.access(env, os.R_OK):
+        load_dotenv()
+
+        if os.getenv('btrix_username') != None:
+            global btrix_username
+            btrix_username = os.getenv('btrix_username')
+            print (btrix_username)
+
+        if os.getenv('btrix_password') != None:
+            global btrix_password
+            btrix_password = os.getenv('btrix_password')
+
+        global btrix_protocol
+        if os.getenv('btrix_protocol') != None:
+            btrix_protocol = os.getenv('btrix_protocol')
+        else:
+            btrix_protocol = btrix_default_protocol
+
+        global btrix_hostname
+        if os.getenv('btrix_hostname') != None:
+            btrix_hostname = os.getenv('btrix_hostname')
+        else:
+            btrix_hostname = btrix_default_hostname
+
+        global btrix_port
+        if os.getenv('btrix_port') != None:
+            btrix_port = os.getenv('btrix_port')
+        else:
+            btrix_port = btrix_default_port  
+    else:
+        print("Either the file is missing or not readable")
+
+    
 def print_tmp_dir():
     print("print_tmp_dir")
 def create_tmp_dir():
     print("create_tmp_dir")
 def btrix_authenticate():
-    print("btrix_authenticate")
-def brix_workflow_post():
+    btrix_login_url = "{}://{}:{}/api/auth/jwt/login".format(btrix_protocol, btrix_hostname, btrix_port)
+    login_json = {'username': btrix_username, 'password': btrix_password}
+    print (btrix_login_url)
+    print (login_json)
+    response = requests.post(btrix_login_url, data=login_json, headers=login_header)
+    print (response.status_code)
+    if response.status_code == 200:
+        if response.json()["access_token"]:
+            global access_token
+            access_token = response.json()["access_token"]
+def brix_workflow_post():   
     print("brix_workflow_post")
 def btrix_worklow_get():
     print("btrix_worklow_get")
@@ -53,7 +109,8 @@ def btrix_worklow_get():
 # once the workflow is determined, lets do the work
 match mode:
     case "create":
-        print("create")
+        evaluate_environment()
+        btrix_authenticate()
     case "bulkcreate":
         print("bulkcreate")
     case "status":
