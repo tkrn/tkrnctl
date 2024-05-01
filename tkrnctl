@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 # standard stuff
-import argparse, requests, sys, json, termcolor, os
+import argparse, requests, sys, json, os, tempfile, random, string, shutil, uuid, pathlib, termcolor
 from dotenv import load_dotenv
 version = "1.0.0"
 
@@ -13,12 +13,9 @@ btrix_default_hostname = "localhost"
 btrix_default_port = "30870"
 
 # runtime variables
-access_token = None
-btrix_protocol = None
-btrix_hostname = None
-btrix_port = None
-btrix_username = None
-btrix_password = None
+access_token, tmp_dir = None, None
+btrix_protocol, btrix_hostname, btrix_port = None, None, None
+btrix_username, btrix_password = None, None
 
 # dealing with the input/output of the program
 parser = argparse.ArgumentParser(prog="tkrnctl", add_help=False,
@@ -51,7 +48,6 @@ elif args.bulkfilename:
 
 # lets define those functions
 def evaluate_environment():
-    print("evaluate_environment")
     env = "./.env"
     if os.path.isfile(env) and os.access(env, os.R_OK):
         load_dotenv()
@@ -59,7 +55,6 @@ def evaluate_environment():
         if os.getenv('btrix_username') != None:
             global btrix_username
             btrix_username = os.getenv('btrix_username')
-            print (btrix_username)
 
         if os.getenv('btrix_password') != None:
             global btrix_password
@@ -85,16 +80,28 @@ def evaluate_environment():
     else:
         print("Either the file is missing or not readable")
 
-    
-def print_tmp_dir():
-    print("print_tmp_dir")
+def write_post_json_file(destination, source, search, replace):
+    with open(source, 'r') as file:
+        data = file.read()
+        data = data.replace(search, replace)
+    with open(destination, 'w') as file:
+        file.write(data)
+
+def random_json_filename():
+    return str(uuid.uuid4()).split("-")[0] + ".json"
+
 def create_tmp_dir():
-    print("create_tmp_dir")
+    global tmp_dir
+    tmp_dir = str(tempfile.mkstemp(prefix="tkrnctl_")[1])
+    
+def random_tmp_json_filepath():
+    json_file = random_json_filename()
+    full_path = pathlib.Path(tmp_dir) / json_file
+    return full_path
+
 def btrix_authenticate():
     btrix_login_url = "{}://{}:{}/api/auth/jwt/login".format(btrix_protocol, btrix_hostname, btrix_port)
     login_json = {'username': btrix_username, 'password': btrix_password}
-    print (btrix_login_url)
-    print (login_json)
     response = requests.post(btrix_login_url, data=login_json, headers=login_header)
     print (response.status_code)
     if response.status_code == 200:
@@ -110,6 +117,7 @@ def btrix_worklow_get():
 match mode:
     case "create":
         evaluate_environment()
+        create_tmp_dir()
         btrix_authenticate()
     case "bulkcreate":
         print("bulkcreate")
