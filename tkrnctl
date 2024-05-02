@@ -11,39 +11,42 @@ login_header = {"Content-Type":"application/x-www-form-urlencoded"}
 btrix_default_protocol = "http"
 btrix_default_hostname = "localhost"
 btrix_default_port = "30870"
+template_default_replace_txt = "###SEEDURL###"
+template_default_file = "seed-crawl.tmpl"
 
 # runtime variables
 access_token, tmp_dir = None, None
 btrix_protocol, btrix_hostname, btrix_port = None, None, None
 btrix_username, btrix_password = None, None
+template_replace_txt, template_file = None, None
 
 # dealing with the input/output of the program
 parser = argparse.ArgumentParser(prog="tkrnctl", add_help=False,
     description="tkrn's archive control tool - " + version,
     epilog="For more information please goto: https://github.com/tkrn/tkrnctl")
 parser.add_argument("-v", help="increase output verbosity", action="store_true", dest="verbose")
-parser.add_argument("-c", help="create single Browsertrix Cloud workflow", action="store", dest="fqdn")
+parser.add_argument("-c", help="create single Browsertrix Cloud workflow", action="store", dest="in_fqdn")
 parser.add_argument("-b", help="create bulk Browsertrix Cloud workflows from file", action="store", 
-    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="bulkfilename")
-parser.add_argument("-s", help="status of crawls for Browsertrix Cloud", action="store_true", dest="status")
-parser.add_argument("-u", help="username for Browsertrix Cloud", action="store", dest="username")
-parser.add_argument("-p", help="password for Browsertrix Cloud", action="store", dest="password")
-parser.add_argument("-h", help="host for Browsertrix Cloud", action="store", dest="host", default="localhost")
-parser.add_argument("-o", help="org ID for within Browsertrix Cloud", action="store", dest="orgid")
+    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_bulk_filename")
+parser.add_argument("-s", help="status of crawls for Browsertrix Cloud", action="store_true", dest="in_status")
+parser.add_argument("-u", help="username for Browsertrix Cloud", action="store", dest="in_username")
+parser.add_argument("-p", help="password for Browsertrix Cloud", action="store", dest="in_password")
+parser.add_argument("-h", help="host for Browsertrix Cloud", action="store", dest="host", default="in_localhost")
+parser.add_argument("-o", help="org ID for within Browsertrix Cloud", action="store", dest="in_org_id")
 parser.add_argument("-t", help="Browsertrix Cloud workflow JSON template to post", action="store",
-    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="tmplfilename")
+    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_template_file")
 parser.add_argument("-e", help="tkrnctl environmental file for stored secrets", action="store",
-    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="envfilename")
+    nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_envfilename")
 args = parser.parse_args()
 
 # internal mode handling
 mode = "none"
-if args.status:
+if args.in_status:
     mode = "status"
-elif args.fqdn:
+elif args.in_fqdn:
     mode = "create"
-elif args.bulkfilename:
-    if args.bulkfilename.name != "<stdin>":
+elif args.in_bulk_filename:
+    if args.in_bulk_filename.name != "<stdin>":
         mode = "bulkcreate"
 
 # lets define those functions
@@ -76,7 +79,20 @@ def evaluate_environment():
         if os.getenv('btrix_port') != None:
             btrix_port = os.getenv('btrix_port')
         else:
-            btrix_port = btrix_default_port  
+            btrix_port = btrix_default_port
+
+        global template_replace_txt
+        if os.getenv('template_replace_txt') != None:
+            template_replace_txt = os.getenv('template_replace_txt')
+        else:
+            template_replace_txt = template_default_replace_txt 
+
+        global template_file
+        if os.getenv('template_default_file') != None:
+            template_file = os.getenv('template_default_file')
+        else:
+            template_file = template_default_file 
+            
     else:
         print("Either the file is missing or not readable")
 
@@ -95,9 +111,19 @@ def create_tmp_dir():
     tmp_dir = str(tempfile.mkstemp(prefix="tkrnctl_")[1])
     
 def random_tmp_json_filepath():
+    if tmp_dir == None:
+        create_tmp_dir()
     json_file = random_json_filename()
     full_path = pathlib.Path(tmp_dir) / json_file
     return full_path
+
+def clean_url(uri):
+    processed_uri = None
+    try:
+        processed_uri = uri.split("/")[2]
+    except:
+        processed_uri = uri
+    return processed_uri
 
 def btrix_authenticate():
     btrix_login_url = "{}://{}:{}/api/auth/jwt/login".format(btrix_protocol, btrix_hostname, btrix_port)
@@ -117,8 +143,11 @@ def btrix_worklow_get():
 match mode:
     case "create":
         evaluate_environment()
-        create_tmp_dir()
         btrix_authenticate()
+        if access_token != None:
+            api_post_file = random_tmp_json_filepath()
+            write_post_json_file(template_file,api_post_file,template_replace_txt,clean_url(args.in_fqdn))
+
     case "bulkcreate":
         print("bulkcreate")
     case "status":
