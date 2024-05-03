@@ -58,20 +58,20 @@ def evaluate_environment():
         load_dotenv()
        
         global btrix_username
-        if in_username == None:
+        if args.in_username == None:
             if os.getenv('btrix_username') != None:
                 
                 btrix_username = os.getenv('btrix_username')
         else:
-            btrix_username = in_username
+            btrix_username = args.in_username
 
         global btrix_password
-        if in_password == None:
+        if args.in_password == None:
             if os.getenv('btrix_password') != None:
                 
                 btrix_password = os.getenv('btrix_password')
         else:
-            btrix_password = in_password
+            btrix_password = args.in_password
 
         global btrix_protocol
         if os.getenv('btrix_protocol') != None:
@@ -80,13 +80,13 @@ def evaluate_environment():
             btrix_protocol = btrix_default_protocol
 
         global btrix_hostname
-        if in_hostname == None:
+        if args.in_hostname == None:
             if os.getenv('btrix_hostname') != None:
                 btrix_hostname = os.getenv('btrix_hostname')
             else:
                 btrix_hostname = btrix_default_hostname
         else:
-            btrix_hostname = btrix_default_hostname
+            btrix_hostname = args.in_hostname
 
         global btrix_port
         if os.getenv('btrix_port') != None:
@@ -95,11 +95,11 @@ def evaluate_environment():
             btrix_port = btrix_default_port
 
         global btrix_org_uuid
-        if in_org_uuid == None:
+        if args.in_org_uuid == None:
             if os.getenv('btrix_org_uuid') != None:
                 btrix_org_uuid = os.getenv('btrix_org_uuid')
         else:
-            btrix_org_uuid = in_org_uuid
+            btrix_org_uuid = args.in_org_uuid
 
         global template_replace_txt
         if os.getenv('template_replace_txt') != None:
@@ -108,17 +108,16 @@ def evaluate_environment():
             template_replace_txt = template_default_replace_txt 
 
         global template_file
-        if in_template_file == None:
+        if args.in_template_file.name == "<stdin>":
             if os.getenv('template_default_file') != None:
                 template_file = os.getenv('template_default_file')
             else:
                 template_file = template_default_file
         else:
-            template_file = in_template_file
+            template_file = args.in_template_file.name
             
     else:
         print("Either the file is missing or not readable")
-    print(args)
 
 def write_post_json_file(destination, source, search, replace):
     with open(source, 'r') as file:
