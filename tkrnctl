@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
 # standard stuff
-import argparse, requests, sys, json, os, tempfile, random, string, shutil, uuid, pathlib, termcolor
+import argparse, requests, sys, json, os, tempfile, random, string, shutil, uuid, pathlib
+from termcolor import colored, cprint
 from dotenv import load_dotenv
+
 version = "1.0.0"
 
 # defaults
@@ -28,11 +30,11 @@ parser.add_argument("-v", help="increase output verbosity", action="store_true",
 parser.add_argument("-c", help="create single Browsertrix Cloud workflow", action="store", dest="in_fqdn")
 parser.add_argument("-b", help="create bulk Browsertrix Cloud workflows from file", action="store", 
     nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_bulk_filename")
-parser.add_argument("-s", help="status of crawls for Browsertrix Cloud", action="store_true", dest="in_status")
+parser.add_argument("-l", help="list status of crawls for Browsertrix Cloud", action="store_true", dest="in_status")
 parser.add_argument("-u", help="username for Browsertrix Cloud", action="store", dest="in_username")
 parser.add_argument("-p", help="password for Browsertrix Cloud", action="store", dest="in_password")
-parser.add_argument("-h", help="host for Browsertrix Cloud", action="store", dest="host", default="in_localhost")
-parser.add_argument("-o", help="org ID for within Browsertrix Cloud", action="store", dest="in_org_uuid")
+parser.add_argument("-h", help="hostname for Browsertrix Cloud", action="store", dest="in_hostname")
+parser.add_argument("-o", help="org UUID within Browsertrix Cloud", action="store", dest="in_org_uuid")
 parser.add_argument("-t", help="Browsertrix Cloud workflow JSON template to post", action="store",
     nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_template_file")
 parser.add_argument("-e", help="tkrnctl environmental file for stored secrets", action="store",
@@ -54,14 +56,22 @@ def evaluate_environment():
     env = "./.env"
     if os.path.isfile(env) and os.access(env, os.R_OK):
         load_dotenv()
+       
+        global btrix_username
+        if in_username == None:
+            if os.getenv('btrix_username') != None:
+                
+                btrix_username = os.getenv('btrix_username')
+        else:
+            btrix_username = in_username
 
-        if os.getenv('btrix_username') != None:
-            global btrix_username
-            btrix_username = os.getenv('btrix_username')
-
-        if os.getenv('btrix_password') != None:
-            global btrix_password
-            btrix_password = os.getenv('btrix_password')
+        global btrix_password
+        if in_password == None:
+            if os.getenv('btrix_password') != None:
+                
+                btrix_password = os.getenv('btrix_password')
+        else:
+            btrix_password = in_password
 
         global btrix_protocol
         if os.getenv('btrix_protocol') != None:
@@ -70,8 +80,11 @@ def evaluate_environment():
             btrix_protocol = btrix_default_protocol
 
         global btrix_hostname
-        if os.getenv('btrix_hostname') != None:
-            btrix_hostname = os.getenv('btrix_hostname')
+        if in_hostname == None:
+            if os.getenv('btrix_hostname') != None:
+                btrix_hostname = os.getenv('btrix_hostname')
+            else:
+                btrix_hostname = btrix_default_hostname
         else:
             btrix_hostname = btrix_default_hostname
 
@@ -82,8 +95,11 @@ def evaluate_environment():
             btrix_port = btrix_default_port
 
         global btrix_org_uuid
-        if os.getenv('btrix_org_uuid') != None:
-            btrix_org_uuid = os.getenv('btrix_org_uuid')
+        if in_org_uuid == None:
+            if os.getenv('btrix_org_uuid') != None:
+                btrix_org_uuid = os.getenv('btrix_org_uuid')
+        else:
+            btrix_org_uuid = in_org_uuid
 
         global template_replace_txt
         if os.getenv('template_replace_txt') != None:
@@ -92,20 +108,19 @@ def evaluate_environment():
             template_replace_txt = template_default_replace_txt 
 
         global template_file
-        if os.getenv('template_default_file') != None:
-            template_file = os.getenv('template_default_file')
+        if in_template_file == None:
+            if os.getenv('template_default_file') != None:
+                template_file = os.getenv('template_default_file')
+            else:
+                template_file = template_default_file
         else:
-            template_file = template_default_file 
+            template_file = in_template_file
             
     else:
         print("Either the file is missing or not readable")
+    print(args)
 
 def write_post_json_file(destination, source, search, replace):
-    print (destination)
-    print (source)
-    print (search)
-    print (replace)
-
     with open(source, 'r') as file:
         data = file.read()
         data = data.replace(search, replace)
@@ -149,13 +164,28 @@ def brix_workflow_post(json_file):
     with open(api_post_file, 'r') as file:
         response = requests.post(btrix_post_url, data=file.read(), headers=post_header)
         return response.status_code
+
 def btrix_worklow_get():
-    print("btrix_worklow_get")
+    btrix_get_url = "{}://{}:{}/api/orgs/{}/all-crawls".format(btrix_protocol, btrix_hostname, btrix_port, btrix_org_uuid)
+    post_header = {'Content-Type': 'application/json', 'Authorization': "Bearer {}".format(access_token)}
+    response = requests.get(btrix_get_url, headers=post_header)
+    #print(response.json())
+
+def print_header():
+    cprint("tkrnctl's acrthive control tool - version {}\n".format(version), "magenta", attrs=["bold"])
+    cprint("Current Variables:", "green")
+    cprint("  Browstrix URI        : {}://{}:{}".format(btrix_protocol, btrix_hostname, btrix_port), "white")
+    cprint("  Browstrix Username   : {}".format(btrix_username), "white")
+    cprint("  Browstrix Password   : {}".format(btrix_password), "white")
+    cprint("  Browstrix Org UUID   : {}".format(btrix_org_uuid), "white")
+    cprint("  Template File        : {}".format(template_file), "white")
+    cprint("  Template Replace Str : {}\n".format(template_replace_txt), "white")
 
 # once the workflow is determined, lets do the work
 match mode:
     case "create":
         evaluate_environment()
+        print_header()
         btrix_authenticate()
         if access_token != None:
             api_post_file = random_tmp_json_filepath()
@@ -166,6 +196,10 @@ match mode:
     case "bulkcreate":
         print("bulkcreate")
     case "status":
-        print("status")
+        evaluate_environment()
+        print_header()
+        btrix_authenticate()
+        if access_token != None:
+            btrix_worklow_get()
     case _:
         parser.print_help()
