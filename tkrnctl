@@ -4,6 +4,7 @@
 import argparse, requests, sys, json, os, tempfile, random, string, shutil, uuid, pathlib
 from termcolor import colored, cprint
 from dotenv import load_dotenv
+from functools import reduce
 
 version = "1.0.0"
 
@@ -21,6 +22,8 @@ access_token, tmp_dir = None, None
 btrix_protocol, btrix_hostname, btrix_port = None, None, None
 btrix_username, btrix_password, btrix_org_uuid = None, None, None
 template_replace_txt, template_file = None, None
+json_workflow_data = None
+current_workflows = list()
 
 # dealing with the input/output of the program
 parser = argparse.ArgumentParser(prog="tkrnctl", add_help=False,
@@ -40,6 +43,12 @@ parser.add_argument("-t", help="Browsertrix Cloud workflow JSON template to post
 parser.add_argument("-e", help="tkrnctl environmental file for stored secrets", action="store",
     nargs="?", type=argparse.FileType("r"), default=sys.stdin, dest="in_envfilename")
 args = parser.parse_args()
+
+# handle verbose mode
+if args.verbose:
+    verbose = True
+else:
+    verbose = False
 
 # internal mode handling
 mode = "none"
@@ -146,7 +155,7 @@ def clean_url(uri):
         processed_uri = uri.split("/")[2]
     except:
         processed_uri = uri
-    return processed_uri
+    return processed_uri.lower()
 
 def btrix_authenticate():
     btrix_login_url = "{}://{}:{}/api/auth/jwt/login".format(btrix_protocol, btrix_hostname, btrix_port)
@@ -168,14 +177,35 @@ def btrix_worklow_get():
     btrix_get_url = "{}://{}:{}/api/orgs/{}/all-crawls".format(btrix_protocol, btrix_hostname, btrix_port, btrix_org_uuid)
     post_header = {'Content-Type': 'application/json', 'Authorization': "Bearer {}".format(access_token)}
     response = requests.get(btrix_get_url, headers=post_header)
-    #print(response.json())
+    return response.text
+
+def btrix_check_existing_workflow(in_name):
+    match = False
+    for line in current_workflows:
+        if line == in_name:
+            match = True
+            break
+    return match
+
+def btrix_load_existing_workflows():
+    json_workflow_data = json.loads(btrix_worklow_get())
+    for key in json_workflow_data["items"]:
+        if key["name"]:
+            current_workflows.append(key["name"].lower())
+
+def obscure_password(password):
+    hpw = password[:3]
+    for c in range(len(password)-6):
+        hpw = hpw + "."
+    hpw = hpw + password[-3:]
+    return hpw
 
 def print_header():
-    cprint("tkrnctl's acrthive control tool - version {}\n".format(version), "magenta", attrs=["bold"])
+    cprint("\ntkrnctl's archive control tool - version {}\n".format(version), "magenta", attrs=["bold"])
     cprint("Current Variables:", "green")
     cprint("  Browstrix URI        : {}://{}:{}".format(btrix_protocol, btrix_hostname, btrix_port), "white")
     cprint("  Browstrix Username   : {}".format(btrix_username), "white")
-    cprint("  Browstrix Password   : {}".format(btrix_password), "white")
+    cprint("  Browstrix Password   : {}".format(obscure_password(btrix_password)), "white")
     cprint("  Browstrix Org UUID   : {}".format(btrix_org_uuid), "white")
     cprint("  Template File        : {}".format(template_file), "white")
     cprint("  Template Replace Str : {}\n".format(template_replace_txt), "white")
@@ -186,19 +216,31 @@ match mode:
         evaluate_environment()
         print_header()
         btrix_authenticate()
+        btrix_load_existing_workflows()
         if access_token != None:
-            api_post_file = random_tmp_json_filepath()
-            if api_post_file != None:
-                write_post_json_file(api_post_file,template_file,template_replace_txt,clean_url(args.in_fqdn))
-                brix_workflow_post(api_post_file)
-
+            cleaned_url = clean_url(args.in_fqdn)
+            if not (btrix_check_existing_workflow(cleaned_url)):
+                api_post_file = random_tmp_json_filepath()
+                if verbose:
+                    cprint("API JSON Filepath: {}".format(api_post_file), "grey")
+                if api_post_file != None:    
+                    write_post_json_file(api_post_file,template_file,template_replace_txt,cleaned_url)
+                    response = brix_workflow_post(api_post_file)
+                    if response == 200:
+                        cprint("Success creating workflow: {}".format(cleaned_url), "green")
+                    else:
+                        cprint("Failed creating workflow: {}".format(cleaned_url), "red")
+            else:
+                cprint("Found existing workflow (not creating): {}".format(cleaned_url), "red")
     case "bulkcreate":
         print("bulkcreate")
     case "status":
         evaluate_environment()
         print_header()
         btrix_authenticate()
-        if access_token != None:
-            btrix_worklow_get()
+        
+        #if access_token != None:      
+            #parsed = json.loads(data)
+            #print(json.dumps(parsed, indent=2))
     case _:
         parser.print_help()
