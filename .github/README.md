@@ -11,7 +11,21 @@ There are variables that need to be defined before using the script. BTRIX_USER 
 
 ![Browsertrix Cloud Organization ID](https://github.com/tkrn/tkrnctl/blob/main/.github/tkrnctl-org-id.png?raw=true)
 
-First copy the example for your modification:
+Install the Python3 Prerequisites:
+
+Additional modules are required for the script to work. tkrnctl depends on `requests`, `termcolor` and `dotenv` Python modules. These can be install via `pip` 
+
+```shell
+pip install requests termcolor dotenv
+```
+
+or if installing via Ubuntu/Debian apt:
+
+```shell
+sudo apt install python3 python3-requests python3-termcolor python3-dotenv
+```
+
+Copy the example environment file for your modification:
 
 ```shell
 cp tkrnctl.env.example tkrnctl.env
